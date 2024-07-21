@@ -16,9 +16,11 @@ module.exports = async function (context, myTimer) {
     const blobConnectionString = process.env.AzureBlobStorageConnectionString;
     const containerName = process.env.BlobContainerName;
 
+    let client;
+
     try {
         context.log('Connecting to MongoDB...');
-        const client = new MongoClient(mongoConnectionString, {
+        client = new MongoClient(mongoConnectionString, {
             serverSelectionTimeoutMS: 5000,
             connectTimeoutMS: 10000
         });
@@ -34,7 +36,6 @@ module.exports = async function (context, myTimer) {
 
         if (documents.length === 0) {
             context.log.warn('No documents found in MongoDB. Exiting function.');
-            await client.close();
             return;
         }
 
@@ -51,7 +52,6 @@ module.exports = async function (context, myTimer) {
         const containerExists = await containerClient.exists();
         if (!containerExists) {
             context.log.error(`Container "${containerName}" does not exist. Please create it first.`);
-            await client.close();
             return;
         }
 
@@ -67,15 +67,25 @@ module.exports = async function (context, myTimer) {
         await blockBlobClient.uploadStream(readableStream, streamBuffer.length);
         context.log(`CSV file uploaded successfully to Blob Storage: ${blobName}`);
 
-        await client.close();
-        context.log('MongoDB connection closed');
-
         context.log('Function execution completed successfully');
     } catch (error) {
         context.log.error(`Error occurred: ${error.message}`);
         context.log.error(`Error stack: ${error.stack}`);
         if (error.name === 'MongoTimeoutError') {
             context.log.error('MongoDB connection timed out. Check your network settings and connection string.');
+        } else if (error.name === 'MongoNetworkError') {
+            context.log.error('MongoDB network error. Ensure your MongoDB Atlas IP whitelist includes your IP address.');
+        } else {
+            context.log.error('An unexpected error occurred.');
+        }
+    } finally {
+        if (client) {
+            try {
+                await client.close();
+                context.log('MongoDB connection closed');
+            } catch (closeError) {
+                context.log.error(`Error occurred while closing MongoDB connection: ${closeError.message}`);
+            }
         }
     }
 };
