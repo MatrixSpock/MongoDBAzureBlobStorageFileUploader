@@ -27,8 +27,8 @@ module.exports = async function (context, myTimer) {
         await client.connect();
         context.log('Connected to MongoDB successfully');
 
-        const db = client.db(dbName);
-        const collection = db.collection(collectionName);
+        const db = await client.db(dbName);
+        const collection = await db.collection(collectionName);
 
         context.log('Fetching data from MongoDB...');
         const documents = await collection.find({}).toArray();
@@ -45,8 +45,8 @@ module.exports = async function (context, myTimer) {
         context.log(`Generated CSV with size: ${csv.length} bytes`);
 
         context.log('Connecting to Azure Blob Storage...');
-        const blobServiceClient = BlobServiceClient.fromConnectionString(blobConnectionString);
-        const containerClient = blobServiceClient.getContainerClient(containerName);
+        const blobServiceClient = await BlobServiceClient.fromConnectionString(blobConnectionString);
+        const containerClient = await blobServiceClient.getContainerClient(containerName);
 
         context.log('Checking if container exists...');
         const containerExists = await containerClient.exists();
@@ -57,7 +57,7 @@ module.exports = async function (context, myTimer) {
 
         const blobName = `data-export-${timeStamp}.csv`;
         context.log(`Attempting to upload blob: ${blobName}`);
-        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+        const blockBlobClient = await containerClient.getBlockBlobClient(blobName);
 
         const streamBuffer = Buffer.from(csv, 'utf-8');
         const readableStream = new Readable();
